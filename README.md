@@ -28,7 +28,7 @@ VRChat's `VRCStringDownloader` is limited to HTTP GET requests. Kexel bypasses t
 
 ## Prerequisites
 
-*   [Go](https://golang.org/dl/) 1.21 or higher.
+*   [Go](https://golang.org/dl/) 1.26 or higher.
 *   PostgreSQL database (if running in production).
 *   A domain with SSL/HTTPS (Required by VRChat).
 
