@@ -1,0 +1,4 @@
+*.exe
+.env
+*.sqlite3
+*.db

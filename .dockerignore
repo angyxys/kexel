@@ -1,0 +1,11 @@
+.git
+.github
+.vscode
+docker-compose*
+Dockerfile
+README.md
+vendor/
+bin/
+tmp/
+*.log
+.env
