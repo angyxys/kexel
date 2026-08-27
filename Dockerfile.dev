@@ -1,0 +1,17 @@
+FROM golang:1.26.4-alpine
+
+RUN apk add --no-cache git gcc musl-dev
+
+# Install air for hot reload
+RUN go install github.com/cosmtrek/air@latest
+
+WORKDIR /app
+
+# Pre-download dependencies
+COPY go.mod go.sum ./
+RUN go mod download
+
+EXPOSE 8080
+
+# Air will watch for changes
+CMD ["air", "-c", ".air.toml"]
