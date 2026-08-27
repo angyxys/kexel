@@ -35,16 +35,14 @@ VRChat's `VRCStringDownloader` is limited to HTTP GET requests. Kexel bypasses t
 ## Installation
 
 1. Clone the repository:
-   ```bash
-   git clone [https://github.com/angyxys/kexel.git](https://github.com/angyxys/kexel.git)
-   cd kexel
-
+```bash
+git clone https://github.com/angyxys/kexel.git
+cd kexel
 ```
 
 2. Download dependencies:
 ```bash
 go mod tidy
-
 ```
 
 
