@@ -95,31 +95,31 @@ func (s *AuthService) Register(ctx context.Context, username, email, password st
 	return user, nil
 }
 
-// Login authenticates user and returns tokens
-func (s *AuthService) Login(ctx context.Context, username, password string) (accessToken, refreshToken string, err error) {
-	user, err := s.userRepo.GetByUsername(ctx, username)
+// Login authenticates user and returns tokens and user
+func (s *AuthService) Login(ctx context.Context, username, password string) (accessToken, refreshToken string, user *models.User, err error) {
+	user, err = s.userRepo.GetByUsername(ctx, username)
 	if err != nil || user == nil {
-		return "", "", errors.New("invalid username or password")
+		return "", "", nil, errors.New("invalid username or password")
 	}
 
 	// Check password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
-		return "", "", errors.New("invalid username or password")
+		return "", "", nil, errors.New("invalid username or password")
 	}
 
 	// Generate access token
 	accessToken, err = s.generateAccessToken(user)
 	if err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
 
 	// Generate and save refresh token
 	refreshToken, err = s.generateAndSaveRefreshToken(ctx, user)
 	if err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
 
-	return accessToken, refreshToken, nil
+	return accessToken, refreshToken, user, nil
 }
 
 // RefreshAccessToken generates new access token from refresh token

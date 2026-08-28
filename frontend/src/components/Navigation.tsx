@@ -65,6 +65,54 @@ export function Navigation() {
           >
             Invitations
           </a>
+          <a
+            href="/sessions"
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${isActive(
+              '/sessions'
+            )}`}
+          >
+            Sessions
+          </a>
+          <a
+            href="/security"
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${isActive(
+              '/security'
+            )}`}
+          >
+            Security
+          </a>
+          <a
+            href="/webhooks"
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${isActive(
+              '/webhooks'
+            )}`}
+          >
+            Webhooks
+          </a>
+          <a
+            href="/integrations"
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${isActive(
+              '/integrations'
+            )}`}
+          >
+            Integrations
+          </a>
+          <a
+            href="/banners"
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${isActive(
+              '/banners'
+            )}`}
+          >
+            Banners
+          </a>
+          <a
+            href="/tickets"
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${isActive(
+              '/tickets'
+            )}`}
+          >
+            Support
+          </a>
         </nav>
       </div>
     </header>

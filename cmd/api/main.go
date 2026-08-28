@@ -31,6 +31,18 @@ func main() {
 		&models.RefreshToken{},
 		&models.InvitationCode{},
 		&models.AuditLog{},
+		&models.Session{},
+		&models.TOTPSecret{},
+		&models.APIKey{},
+		&models.Webhook{},
+		&models.WebhookEvent{},
+		&models.DiscordIntegration{},
+		&models.PatreonIntegration{},
+		&models.RateLimitRule{},
+		&models.RateLimitLog{},
+		&models.Banner{},
+		&models.Ticket{},
+		&models.TicketComment{},
 	); err != nil {
 		log.Fatalf("error migrating database: %v", err)
 	}
@@ -41,6 +53,25 @@ func main() {
 	refreshTokenRepo := repository.NewRefreshTokenRepository(db)
 	auditRepo := repository.NewAuditLogRepository(db)
 	invitationRepo := repository.NewInvitationRepository(db)
+	sessionRepo := repository.NewSessionRepository(db)
+	totpRepo := repository.NewTOTPRepository(db)
+	apiKeyRepo := repository.NewAPIKeyRepository(db)
+	webhookRepo := repository.NewWebhookRepository(db)
+	webhookEventRepo := repository.NewWebhookEventRepository(db)
+	discordRepo := repository.NewDiscordIntegrationRepository(db)
+	patreonRepo := repository.NewPatreonIntegrationRepository(db)
+	rateLimitRuleRepo := repository.NewRateLimitRuleRepository(db)
+	rateLimitLogRepo := repository.NewRateLimitLogRepository(db)
+	bannerRepo := repository.NewBannerRepository(db)
+	ticketRepo := repository.NewTicketRepository(db)
+	ticketCommentRepo := repository.NewTicketCommentRepository(db)
+
+	// Initialize MinIO client
+	minioClient, err := service.NewMinIOClient()
+	if err != nil {
+		log.Printf("Warning: MinIO initialization failed: %v. Image storage will not work.", err)
+		minioClient = nil
+	}
 
 	// Initialize services
 	playerServ := service.NewPlayerService(playerRepo)
@@ -49,14 +80,30 @@ func main() {
 	banServ := service.NewBanService(playerRepo)
 	statsServ := service.NewStatsService(playerRepo, auditRepo, userRepo)
 	invitationServ := service.NewInvitationService(invitationRepo)
+	sessionServ := service.NewSessionService(sessionRepo, userRepo)
+	totpServ := service.NewTOTPService(totpRepo)
+	apiKeyServ := service.NewAPIKeyService(apiKeyRepo)
+	webhookServ := service.NewWebhookService(webhookRepo, webhookEventRepo)
+	discordServ := service.NewDiscordService(discordRepo)
+	patreonServ := service.NewPatreonService(patreonRepo, playerRepo, userRepo)
+	rateLimitServ := service.NewRateLimitService(rateLimitRuleRepo, rateLimitLogRepo)
+	storageServ := service.NewStorageService(bannerRepo, minioClient, "kexel-banners")
+	ticketServ := service.NewTicketService(ticketRepo, ticketCommentRepo, auditServ)
 
 	// Initialize handlers
 	playerHandl := handler.NewPlayerHandler(playerServ)
-	authHandl := handler.NewAuthHandler(authServ)
+	authHandl := handler.NewAuthHandlerWithSession(authServ, sessionServ)
 	auditHandl := handler.NewAuditHandler(auditServ)
 	banHandl := handler.NewBanHandler(banServ)
 	statsHandl := handler.NewStatsHandler(statsServ)
 	invitationHandl := handler.NewInvitationHandler(invitationServ)
+	sessionHandl := handler.NewSessionHandler(sessionServ)
+	totpHandl := handler.NewTOTPHandler(totpServ)
+	apiKeyHandl := handler.NewAPIKeyHandler(apiKeyServ)
+	webhookHandl := handler.NewWebhookHandler(webhookServ)
+	integrationHandl := handler.NewIntegrationHandler(discordServ, patreonServ, rateLimitServ)
+	storageHandl := handler.NewStorageHandler(storageServ)
+	ticketHandl := handler.NewTicketHandler(ticketServ)
 
 	r := gin.Default()
 	r.Use(cors.Default())
@@ -128,6 +175,74 @@ func main() {
 		webRoute.GET("/audit-logs/stats", auditHandl.GetAuditStats)
 		webRoute.GET("/audit-logs/export", auditHandl.ExportAuditLogs)
 		webRoute.GET("/audit-logs/resource/:id", auditHandl.GetResourceHistory)
+
+		// Sessions
+		webRoute.GET("/sessions", sessionHandl.GetSessions)
+		webRoute.GET("/sessions/stats", sessionHandl.GetSessionStats)
+		webRoute.DELETE("/sessions/:id", sessionHandl.LogoutSession)
+		webRoute.POST("/sessions/logout-all", sessionHandl.LogoutAllSessions)
+
+		// 2FA / TOTP
+		webRoute.POST("/2fa/setup", totpHandl.GetTOTPSetup)
+		webRoute.POST("/2fa/verify", totpHandl.VerifyTOTP)
+		webRoute.GET("/2fa/status", totpHandl.GetTOTPStatus)
+		webRoute.DELETE("/2fa", totpHandl.DisableTOTP)
+		webRoute.POST("/2fa/verify-code", totpHandl.VerifyTOTPCode)
+		webRoute.POST("/2fa/backup-code", totpHandl.VerifyBackupCode)
+
+		// API Keys
+		webRoute.POST("/api-keys", apiKeyHandl.CreateAPIKey)
+		webRoute.GET("/api-keys", apiKeyHandl.GetAPIKeys)
+		webRoute.DELETE("/api-keys/:id", apiKeyHandl.DeleteAPIKey)
+		webRoute.POST("/api-keys/:id/revoke", apiKeyHandl.RevokeAPIKey)
+		webRoute.PATCH("/api-keys/:id/rate-limit", apiKeyHandl.UpdateRateLimit)
+		webRoute.PATCH("/api-keys/:id/scopes", apiKeyHandl.UpdateScopes)
+		webRoute.GET("/api-keys/scopes/available", apiKeyHandl.GetAvailableScopes)
+
+		// Webhooks
+		webRoute.POST("/webhooks", webhookHandl.CreateWebhook)
+		webRoute.GET("/webhooks", webhookHandl.GetWebhooks)
+		webRoute.DELETE("/webhooks/:id", webhookHandl.DeleteWebhook)
+		webRoute.POST("/webhooks/:id/disable", webhookHandl.DisableWebhook)
+		webRoute.GET("/webhooks/:id/events", webhookHandl.GetWebhookEvents)
+		webRoute.GET("/webhooks/events/available", webhookHandl.GetAvailableEvents)
+
+		// Banners & Storage
+		webRoute.POST("/banners", storageHandl.UploadBanner)
+		webRoute.GET("/banners", storageHandl.GetUserBanners)
+		webRoute.GET("/banners/:type", storageHandl.GetBannersByType)
+		webRoute.PATCH("/banners/:id", storageHandl.UpdateBanner)
+		webRoute.DELETE("/banners/:id", storageHandl.DeleteBanner)
+
+		// Tickets & Support
+		webRoute.POST("/tickets", ticketHandl.CreateTicket)
+		webRoute.GET("/tickets", ticketHandl.ListUserTickets)
+		webRoute.GET("/tickets/all", ticketHandl.ListAllTickets)
+		webRoute.GET("/tickets/filter", ticketHandl.FilterTickets)
+		webRoute.GET("/tickets/stats", ticketHandl.GetTicketStats)
+		webRoute.GET("/tickets/:id", ticketHandl.GetTicket)
+		webRoute.PATCH("/tickets/:id", ticketHandl.UpdateTicket)
+		webRoute.DELETE("/tickets/:id", ticketHandl.DeleteTicket)
+		webRoute.POST("/tickets/:id/comments", ticketHandl.AddComment)
+		webRoute.GET("/tickets/:id/comments", ticketHandl.GetTicketComments)
+
+		// Integrations (Discord, Patreon, Rate Limiting)
+		webRoute.POST("/integrations/discord", integrationHandl.SetupDiscord)
+		webRoute.GET("/integrations/discord", integrationHandl.GetDiscordIntegration)
+		webRoute.PATCH("/integrations/discord/channels", integrationHandl.ConfigureDiscordChannels)
+		webRoute.POST("/integrations/discord/test", integrationHandl.TestDiscordConnection)
+		webRoute.DELETE("/integrations/discord", integrationHandl.DisconnectDiscord)
+
+		// Patreon Integration
+		webRoute.GET("/integrations/patreon/oauth-url", integrationHandl.GetPatreonOAuthURL)
+		webRoute.POST("/integrations/patreon/oauth-callback", integrationHandl.HandlePatreonOAuthCallback)
+		webRoute.GET("/integrations/patreon", integrationHandl.GetPatreonIntegration)
+		webRoute.PATCH("/integrations/patreon/tier-mapping", integrationHandl.ConfigurePatreonTierMapping)
+		webRoute.POST("/integrations/patreon/sync", integrationHandl.SyncPatreonMembers)
+		webRoute.DELETE("/integrations/patreon", integrationHandl.DisconnectPatreon)
+
+		// Rate Limiting
+		webRoute.GET("/admin/rate-limit/blocks", integrationHandl.GetRateLimitBlocks)
 
 		// User info
 		webRoute.GET("/me", authHandl.GetCurrentUser)

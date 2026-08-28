@@ -11,12 +11,20 @@ import (
 )
 
 type AuthHandler struct {
-	authServ *service.AuthService
+	authServ    *service.AuthService
+	sessionServ *service.SessionService
 }
 
 func NewAuthHandler(authServ *service.AuthService) *AuthHandler {
 	return &AuthHandler{
 		authServ: authServ,
+	}
+}
+
+func NewAuthHandlerWithSession(authServ *service.AuthService, sessionServ *service.SessionService) *AuthHandler {
+	return &AuthHandler{
+		authServ:    authServ,
+		sessionServ: sessionServ,
 	}
 }
 
@@ -99,13 +107,18 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	accessToken, refreshToken, err := h.authServ.Login(ctx, req.Username, req.Password)
+	accessToken, refreshToken, user, err := h.authServ.Login(ctx, req.Username, req.Password)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"message": err.Error(),
 			"status":  http.StatusUnauthorized,
 		})
 		return
+	}
+
+	// Create session if session service is available
+	if h.sessionServ != nil {
+		_, _ = h.sessionServ.CreateSession(ctx, user.ID, c.ClientIP(), c.Request.UserAgent())
 	}
 
 	c.JSON(http.StatusOK, AuthResponse{
